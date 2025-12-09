@@ -18,6 +18,7 @@ def run_model(
     model_name: str,
     training_window_type: TrainingWindowType = TrainingWindowType.EXPANDING,
     transform: callable = lambda x: np.log1p(x),
+    construct_covariates: callable = lambda df: ([], df),
     output_dir: str = "outputs",
 ):
     # Sanitise inputs
@@ -50,14 +51,12 @@ def run_model(
     df[target_col] = transform(df[target_col])
 
     # Construct covariates
-    df["Lag_Cases_1"] = transform(df["Cases"]).shift(1)
-    df["spe03_2"] = df["spe03"].shift(2)
-    df["spa03_2"] = df["spa03"].shift(2)
-    df["ssta_2"] = df["ssta"].shift(2)
-
-    covar_list = ["Lag_Cases_1", "spe03_2", "spa03_2", "ssta_2"]
-    df = df[[target_col, *covar_list, "time"]]  # subset columns
-    df = df[2:]  # cut lag-induced NaNs
+    covar = construct_covariates(df)
+    df = df.join(covar)
+    covar_list = covar.columns.tolist()
+    df = df[["time", target_col, *covar_list]]  # subset columns
+    start_idx = covar.dropna().index[0]
+    df = df[start_idx:].reset_index(drop=True)  # drop lag-induced NaNs
 
     # Build DARTS TimeSeries
     series = TimeSeries.from_dataframe(

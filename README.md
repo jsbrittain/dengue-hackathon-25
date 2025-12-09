@@ -16,6 +16,9 @@ Run in a Python virtual environment, we recommend [`uv`](https://docs.astral.sh/
 uv venv
 uv pip install -e .
 source .venv/bin/activate
-forecast --run_model --plot_forecasts
 ```
 
+Then, launch a forecast, e.g. for the example NHiTS model:
+```
+python scripts/nhits.py
+```

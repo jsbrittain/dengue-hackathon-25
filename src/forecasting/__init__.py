@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import pandas as pd
 from forecasting.models import TrainingWindowType
 from forecasting.run_model import run_model
 from forecasting.plotting import plot_historical_forecast
@@ -9,11 +10,22 @@ np.random.seed(42)
 
 
 def transform(x):
+    # Transform used for data analysis
     return np.log1p(x)
 
 
 def itransform(y):
+    # (Inverse) transform (only used for plotting)
     return y  # np.expm1(y)
+
+
+def construct_covariates(df):
+    covar = pd.DataFrame(index=df.index)  # return df with matching indices
+    covar["Lag_Cases_1"] = transform(df["Cases"]).shift(1)
+    covar["spe03_2"] = df["spe03"].shift(2)
+    covar["spa03_2"] = df["spa03"].shift(2)
+    covar["ssta_2"] = df["ssta"].shift(2)
+    return covar
 
 
 def main():
@@ -64,6 +76,7 @@ def main():
             model_name=args.model,
             training_window_type=TrainingWindowType(args.training_window_type),
             transform=transform,
+            construct_covariates=construct_covariates,
             output_dir=args.output_dir,
         )
     if args.plot_forecast:
