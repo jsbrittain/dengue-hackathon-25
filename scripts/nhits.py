@@ -15,6 +15,7 @@ isos = ["BLM", "DOM", "MAF", "BRB", "GRD", "PRI"]
 model = "Chronos2"
 training_window_type = TrainingWindowType.ROLLING
 output_dir = "outputs"
+composite = False
 
 steps = {}
 steps["run_model"] = True
@@ -73,7 +74,7 @@ dist = {
 
 def construct_covariates(df: pd.DataFrame) -> pd.DataFrame:
     covar = pd.DataFrame(index=df.index)  # return df with matching indices
-    match 3:
+    match 4:
         case 0:  # No covariates
             return covar
         case 1:  # Specific lagged covariates
@@ -98,6 +99,11 @@ def construct_covariates(df: pd.DataFrame) -> pd.DataFrame:
                         col_name = f"flow_{iso_from}_to_{iso_to}"
                         dst = dist[(iso_from, iso_to)]
                         covar[col_name] = np.log(df[f"pop_{iso_from}"]) - np.log(dst)
+        case 4:  # All covariates lagged by 1, 2 and 3 weeks
+            covar_cols = df.columns.difference(["time", 'Unnamed: 0', "Cases", "region", "Region", 'Country', 'Spatial_Resolution'])
+            for lag in [1, 2, 3]:
+                for col in covar_cols:
+                    covar[f"{col}_lag{lag}"] = df[col].shift(lag)
         case _:
             raise ValueError("Invalid covariate construction case")
     return covar
@@ -121,6 +127,7 @@ if steps["run_model"]:
         transform=transform,
         construct_covariates=construct_covariates,
         output_dir=output_dir,
+        composite=composite,
     )
 
 # Plot historical forecast (loads results from output folder)
@@ -131,5 +138,6 @@ if steps["plot_historical_forecasts"]:
         isos=isos,
         transform=transform,
         itransform=itransform,
-        output_dir=output_dir,
+        folder=output_dir,
+        # filename='backup/forecast_Chronos2_rolling_composite_h6_mobility_allvars.csv',
     )

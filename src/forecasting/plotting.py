@@ -104,14 +104,11 @@ def plot_historical_forecasts(
     isos: list[str],
     transform: callable = lambda x: np.log1p(x),
     itransform: callable = lambda y: np.expm1(y),
-    output_dir: str = "outputs",
+    folder: str = "outputs",
+    filename: str = 'forecast_univariate.csv',
 ):
     dirstem = Path(__file__).parent.parent.parent
-    forecasts_df = pd.read_csv(
-        dirstem
-        / output_dir
-        / f"forecast_{label}_{training_window_type.value}_composite.csv"
-    )
+    forecasts_df = pd.read_csv(dirstem / folder / filename)
     forecasts_df["time"] = pd.to_datetime(forecasts_df["time"])
 
     plt.figure()

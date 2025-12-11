@@ -14,16 +14,15 @@ from .models import (
 )
 
 
-def run_model(
+def _run_model(
     isos: List[str],
     model_name: str,
     training_window_type: TrainingWindowType = TrainingWindowType.EXPANDING,
     transform: callable = lambda x: np.log1p(x),
     construct_covariates: callable = lambda df: df,
-    output_dir: str = "outputs",
+    composite: bool = False,
 ):
     # Sanitise inputs
-    iso_name = "composite" if len(isos) > 1 else isos[0].upper()
     model_name = model_name.lower()
 
     # Parameters
@@ -145,15 +144,6 @@ def run_model(
             num_samples=num_samples,
         )
 
-        # # Reframe forecast as pandas DataFrame
-        # forecast_df = forecast.quantile(quantiles).to_dataframe()
-        # forecast_df["horizon"] = list(range(1, len(forecast_df) + 1))
-        # forecast_df = forecast_df.reset_index().melt(
-        #     id_vars=["time", "horizon"],
-        #     var_name="quantile",
-        #     value_name="Cases",
-        # )
-
         forecast_df = forecast.quantile(quantiles).to_dataframe().reset_index()
         forecast_df["horizon"] = list(range(1, len(forecast_df) + 1))
         df_long = forecast_df.melt(
@@ -168,24 +158,39 @@ def run_model(
         # Append predictions at timepoint
         print(f"Adjust time by {adjust_time} months")
         forecast_dfs.append(forecast_df)
-        # forecast_dfs.append(
-        #     pd.DataFrame(
-        #         {
-        #             "model": label,
-        #             "time": forecast_df["time"],  # + pd.DateOffset(months=adjust_time),
-        #             "horizon": forecast_df["horizon"],
-        #             "quantile": forecast_df["quantile"],
-        #             "Cases": forecast_df["Cases"],
-        #         }
-        #     )
-        # )
 
     # Combine timepoints into a single DataFrame
     forecast_df = pd.concat(forecast_dfs)
+
+    return forecast_df
+
+
+def run_model(
+    isos: List[str],
+    output_dir: str = "outputs",
+    composite: bool = True,
+    *args,
+    **kwargs,
+):
+    if composite:
+        forecast_df = _run_model(isos=isos, *args, **kwargs)
+        iso_name = "composite"
+    else:
+        forecast_dfs = []
+        for iso in isos:
+            df = _run_model(
+                isos=[iso],
+                *args,
+                **kwargs,
+            )
+            df['region'] = iso.upper()
+            forecast_dfs.append(df)
+        forecast_df = pd.concat(forecast_dfs)
+        iso_name = "univariate"
 
     # Save forecast
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     forecast_df.to_csv(
-        output_path / f"forecast_{label}_{training_window_type.value}_{iso_name}.csv",
+        output_path / f"forecast_{iso_name}.csv",
     )
