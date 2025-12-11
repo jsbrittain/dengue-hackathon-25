@@ -9,11 +9,13 @@ from darts.models import (
     TiDEModel as DartsTiDEModel,
     NBEATSModel as DartsNBEATSModel,
     NHiTSModel as DartsNHiTSModel,
+    XGBModel as DartsXGBModel,
+    Chronos2Model as DartsChronos2Model,
 )
 
 quantiles = [
     0.01,
-    0.025,
+    # 0.025,
     0.05,
     0.10,
     0.15,
@@ -33,7 +35,7 @@ quantiles = [
     0.85,
     0.90,
     0.95,
-    0.975,
+    # 0.975,
     0.99,
 ]
 
@@ -56,7 +58,7 @@ class Model(ABC):
         return self.model.predict(*args, **kwargs)
 
     @abstractmethod
-    def reform(self, *args, **kwargs):
+    def reform(self, **kwargs):
         raise NotImplementedError("reform must be implemented by subclasses")
 
     @abstractmethod
@@ -65,7 +67,7 @@ class Model(ABC):
 
 
 class ModelRollingWindow(Model):
-    def reform(self, *args, **kwargs):
+    def reform(self, **kwargs):
         # By default models are not reformed at each prediction step, instead they
         # use the base model. However, this behaviour can be overriden.
         pass
@@ -78,25 +80,31 @@ class ModelExpandingWindow(Model):
         self.model = self.create_model(*self.params_args, **kwargs)
 
 
-class NHiTSModelRollingWindow(Model):
-    def create_model(self, input_chunk_length, output_chunk_length, likelihood):
+class NHiTSModelRollingWindow(ModelRollingWindow):
+    def create_model(
+        self, input_chunk_length, output_chunk_length, likelihood, output_chunk_shift=0
+    ):
         return DartsNHiTSModel(
             input_chunk_length=input_chunk_length,
             output_chunk_length=output_chunk_length,
+            # output_chunk_shift=output_chunk_shift,
             likelihood=likelihood,
         )
 
 
 class NHiTSModelExpandingWindow(ModelExpandingWindow):
-    def create_model(self, input_chunk_length, output_chunk_length, likelihood):
+    def create_model(
+        self, input_chunk_length, output_chunk_length, likelihood, output_chunk_shift=0
+    ):
         return DartsNHiTSModel(
             input_chunk_length=input_chunk_length,
             output_chunk_length=output_chunk_length,
+            # output_chunk_shift=output_chunk_shift,
             likelihood=likelihood,
         )
 
 
-class NBEATSModelRollingWindow(Model):
+class NBEATSModelRollingWindow(ModelRollingWindow):
     def create_model(self, input_chunk_length, output_chunk_length, likelihood):
         return DartsNBEATSModel(
             input_chunk_length=input_chunk_length,
@@ -114,7 +122,7 @@ class NBEATSModelExpandingWindow(ModelExpandingWindow):
         )
 
 
-class TiDEModelRollingWindow(Model):
+class TiDEModelRollingWindow(ModelRollingWindow):
     def create_model(self, input_chunk_length, output_chunk_length, likelihood):
         return DartsTiDEModel(
             input_chunk_length=input_chunk_length,
@@ -126,6 +134,46 @@ class TiDEModelRollingWindow(Model):
 class TiDEModelExpandingWindow(ModelExpandingWindow):
     def create_model(self, input_chunk_length, output_chunk_length, likelihood):
         return DartsTiDEModel(
+            input_chunk_length=input_chunk_length,
+            output_chunk_length=output_chunk_length,
+            likelihood=likelihood,
+        )
+
+
+class XGBoostModelRollingWindow(ModelRollingWindow):
+    def create_model(self, lags, output_chunk_length):
+        return DartsXGBModel(
+            lags=lags,
+            output_chunk_length=output_chunk_length,
+            likelihood="quantile",
+            quantiles=quantiles,
+            lags_past_covariates=lags,
+        )
+
+
+class XGBoostModelExpandingWindow(ModelExpandingWindow):
+    def create_model(self, lags, output_chunk_length):
+        return DartsXGBModel(
+            lags=lags,
+            output_chunk_length=output_chunk_length,
+            likelihood="quantile",
+            quantiles=quantiles,
+            lags_past_covariates=lags,
+        )
+
+
+class Chronos2ModelRollingWindow(ModelRollingWindow):
+    def create_model(self, input_chunk_length, output_chunk_length, likelihood):
+        return DartsChronos2Model(
+            input_chunk_length=input_chunk_length,
+            output_chunk_length=output_chunk_length,
+            likelihood=likelihood,
+        )
+
+
+class Chronos2ModelExpandingWindow(ModelExpandingWindow):
+    def create_model(self, input_chunk_length, output_chunk_length, likelihood):
+        return DartsChronos2Model(
             input_chunk_length=input_chunk_length,
             output_chunk_length=output_chunk_length,
             likelihood=likelihood,
@@ -179,6 +227,35 @@ def get_model(model_name, training_window_type, max_horizon):
                 model_class = NBEATSModelRollingWindow
             elif training_window_type == TrainingWindowType.EXPANDING:
                 model_class = NBEATSModelExpandingWindow
+            else:
+                raise ValueError(
+                    f"Training window type {training_window_type} not recognized"
+                )
+            model = model_class(
+                input_chunk_length=24,
+                output_chunk_length=max_horizon,
+                likelihood=QuantileRegression(quantiles=quantiles),
+            )
+        case "xgboost":
+            label = "XGBoost"
+            if training_window_type == TrainingWindowType.ROLLING:
+                model_class = XGBoostModelRollingWindow
+            elif training_window_type == TrainingWindowType.EXPANDING:
+                model_class = XGBoostModelExpandingWindow
+            else:
+                raise ValueError(
+                    f"Training window type {training_window_type} not recognized"
+                )
+            model = model_class(
+                lags=24,
+                output_chunk_length=max_horizon,
+            )
+        case "chronos" | "chronos2":
+            label = "Chronos2"
+            if training_window_type == TrainingWindowType.ROLLING:
+                model_class = Chronos2ModelRollingWindow
+            elif training_window_type == TrainingWindowType.EXPANDING:
+                model_class = Chronos2ModelExpandingWindow
             else:
                 raise ValueError(
                     f"Training window type {training_window_type} not recognized"
