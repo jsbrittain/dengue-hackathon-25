@@ -121,15 +121,15 @@ def _run_model(
             horizon = min(max_horizon, sum(times >= time))
             adjust_time = output_chunk_shift
         elif training_window_type == TrainingWindowType.ROLLING:
-            # output_chunk_length = max_horizon
-            # output_chunk_shift = 5
-            # model.reform(
-            #     input_chunk_length=24,
-            #     output_chunk_length=1,
-            #     output_chunk_shift=output_chunk_shift,
-            # )
-            # adjust_time = 0  # output_chunk_shift
-            pass
+            output_chunk_length = max_horizon
+            # output_chunk_shift = 0
+            model.reform(
+                input_chunk_length=min_history,
+                output_chunk_length=output_chunk_length,
+                # output_chunk_shift=output_chunk_shift,
+            )
+            adjust_time = 0  # output_chunk_shift
+            # horizon = min(max_horizon, sum(times >= time))
         else:
             raise ValueError("Unknown TrainingWindowType.")
 

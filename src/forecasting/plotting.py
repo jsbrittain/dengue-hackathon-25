@@ -105,11 +105,16 @@ def plot_historical_forecasts(
     transform: callable = lambda x: np.log1p(x),
     itransform: callable = lambda y: np.expm1(y),
     folder: str = "outputs",
-    filename: str = 'forecast_univariate.csv',
+    filename: str = None,
+    include_wis: bool = False,
 ):
     dirstem = Path(__file__).parent.parent.parent
     forecasts_df = pd.read_csv(dirstem / folder / filename)
     forecasts_df["time"] = pd.to_datetime(forecasts_df["time"])
+
+    # forecasts_df = forecasts_df[
+    #     (forecasts_df['time'] >= '2021-01-01') & (forecasts_df['time'] < '2022-01-01')
+    # ]
 
     plt.figure()
     for iso_idx, iso in enumerate(isos):
@@ -124,40 +129,10 @@ def plot_historical_forecasts(
         # Plot forecasts
         horizons = [1, 3, 6]
         for ix, horizon in enumerate(horizons):
-            plt.subplot(len(horizons), len(isos), ix * len(isos) + iso_idx + 1)
+            ax1 = plt.subplot(len(horizons), len(isos), ix * len(isos) + iso_idx + 1)
+            if include_wis:
+                ax2 = ax1.twinx()
             df = forecast_df[forecast_df["horizon"] == horizon]
-            if True:
-                # 90% interval
-                plt.fill_between(
-                    df[df["quantile"] == 0.500]["time"],
-                    itransform(df[df["quantile"] == 0.050]["Cases"]),
-                    itransform(df[df["quantile"] == 0.950]["Cases"]),
-                    color="steelblue",
-                    alpha=0.2,
-                    label="90% Prediction Interval",
-                )
-                # 50% interval
-                plt.fill_between(
-                    df[df["quantile"] == 0.500]["time"],
-                    itransform(df[df["quantile"] == 0.250]["Cases"]),
-                    itransform(df[df["quantile"] == 0.750]["Cases"]),
-                    color="steelblue",
-                    alpha=0.5,
-                    label="50% Prediction Interval",
-                )
-                # Case data
-                plt.plot(
-                    cases_df["time"],
-                    itransform(cases_df["Cases"]),
-                    label="Original Series",
-                )
-                # Median
-                plt.plot(
-                    df[df["quantile"] == 0.500]["time"],
-                    itransform(df[df["quantile"] == 0.500]["Cases"]),
-                    label=f"Forecast Horizon {horizon} - {label}",
-                )
-                plt.xlim([cases_df["time"].min(), forecast_df["time"].max()])
 
             # Metrics
 
@@ -173,6 +148,50 @@ def plot_historical_forecasts(
                 itransform(merged["Cases_pred"].values),
             )
 
+            if True:
+                # 90% interval
+                ax1.fill_between(
+                    df[df["quantile"] == 0.500]["time"],
+                    itransform(df[df["quantile"] == 0.050]["Cases"]),
+                    itransform(df[df["quantile"] == 0.950]["Cases"]),
+                    color="steelblue",
+                    alpha=0.2,
+                    label="90% Prediction Interval",
+                )
+                # 50% interval
+                ax1.fill_between(
+                    df[df["quantile"] == 0.500]["time"],
+                    itransform(df[df["quantile"] == 0.250]["Cases"]),
+                    itransform(df[df["quantile"] == 0.750]["Cases"]),
+                    color="steelblue",
+                    alpha=0.5,
+                    label="50% Prediction Interval",
+                )
+                # Case data
+                ax1.plot(
+                    cases_df["time"],
+                    itransform(cases_df["Cases"]),
+                    label="Original Series",
+                )
+                # Median
+                ax1.plot(
+                    df[df["quantile"] == 0.500]["time"],
+                    itransform(df[df["quantile"] == 0.500]["Cases"]),
+                    label=f"Forecast Horizon {horizon} - {label}",
+                )
+
+            if include_wis:
+                ax2.plot(
+                    wis_df["time"],
+                    wis_df["WIS"],
+                    color="red",
+                    label="WIS",
+                )
+
+            plt.xlim([cases_df["time"].min(), forecast_df["time"].max()])
+
             # Title
             plt.title(f"R^2 = {r2:.2f} WIS = {wis_df['WIS'].mean():.2f}")
+            print(f"{iso}\t{horizon}\tR2\t{r2:.2f}")
+            print(f"{iso}\t{horizon}\tWIS\t{wis_df['WIS'].mean():.2f}")
     plt.show()

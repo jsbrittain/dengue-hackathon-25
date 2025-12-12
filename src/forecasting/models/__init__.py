@@ -68,9 +68,9 @@ class Model(ABC):
 
 class ModelRollingWindow(Model):
     def reform(self, **kwargs):
-        # By default models are not reformed at each prediction step, instead they
-        # use the base model. However, this behaviour can be overriden.
-        pass
+        # Form parameters with new kwargs overrides
+        kwargs = {**self.params_kwargs, **kwargs}
+        self.model = self.create_model(*self.params_args, **kwargs)
 
 
 class ModelExpandingWindow(Model):

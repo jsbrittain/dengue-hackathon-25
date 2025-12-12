@@ -11,14 +11,15 @@ from forecasting.plotting import plot_historical_forecasts
 
 
 isos = ["BLM", "DOM", "MAF", "BRB", "GRD", "PRI"]
-# model = "N-HiTS"
+# model = "NHiTS"
+# model = "TiDE"
 model = "Chronos2"
 training_window_type = TrainingWindowType.ROLLING
 output_dir = "outputs"
-composite = False
+composite = True
 
 steps = {}
-steps["run_model"] = True
+steps["run_model"] = False
 steps["plot_historical_forecasts"] = True
 
 
@@ -74,7 +75,7 @@ dist = {
 
 def construct_covariates(df: pd.DataFrame) -> pd.DataFrame:
     covar = pd.DataFrame(index=df.index)  # return df with matching indices
-    match 4:
+    match 0:
         case 0:  # No covariates
             return covar
         case 1:  # Specific lagged covariates
@@ -139,5 +140,7 @@ if steps["plot_historical_forecasts"]:
         transform=transform,
         itransform=itransform,
         folder=output_dir,
-        # filename='backup/forecast_Chronos2_rolling_composite_h6_mobility_allvars.csv',
+        filename=f'backup/forecast_{model}_rolling_composite_h6.csv',
+        # filename=f'backup/forecast_{model}_rolling_composite_h6_mobility.csv',
+        # include_wis=False,
     )
